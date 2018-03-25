@@ -20,7 +20,7 @@ PImage logo_img;
 String logoFile = "logo.png";
 
 boolean useMic = true;
-boolean autochange = false;
+boolean autochange = true;
 float micSensitivity = 5;
 float noise_offset = 0.0;
 int wavesourceLength;
@@ -30,6 +30,7 @@ int algorithmSelection = 0;
 int currentAlgorithm = 0;
 int showSprocket, showFT = 1;
 int showLogo, showWaveform, showNoiseLines, showMessage = 0;
+float alphaSprocket, alphaFT, alphaLogo, alphaWaveform, alphaNoiseLines, alphaMessage;
 int messageDisabled = 1;
 int messageCounter = 0;
 int messageTimer = 0;
@@ -38,7 +39,7 @@ int noiseAlgorithm = 0;
 float noiseWarmthValue = 0;
 
 PFont font;
-// The font must be located in the sketch's 
+// The font must be located in the sketch's
 // "data" directory to load successfully
 
 
@@ -48,40 +49,56 @@ void setup()
   logo_img = loadImage(logoFile);
   font = loadFont("Dosis-Light-48.vlw");
   textFont(font, 48);  minim = new Minim(this);
-  if(useMic){
+  if (useMic) {
     in = minim.getLineIn();
     fft = new FFT(in.bufferSize(), in.sampleRate());
-  }else{
+  } else {
     player = minim.loadFile("Artist - Title.mp3");
     fft = new FFT(player.bufferSize(), player.sampleRate());
   }
   y = new float[fft.specSize()];
   x = new float[fft.specSize()];
   angle = new float[fft.specSize()];
-  if(!useMic){
+  if (!useMic) {
     wavesource = player;
     player.play();
-  }else{
+  } else {
     wavesource = in;
   }
   wavesourceLength = wavesource.left.size();
   frameRate(240);
+  alphaSprocket = showSprocket;
+  alphaFT = showFT;
+  alphaLogo = showLogo;
+  alphaWaveform = showWaveform;
+  alphaNoiseLines = showNoiseLines;
+  alphaMessage = showMessage;
 }
- 
-void draw(){
+
+float updateAlpha(float alpha, int show) {
+  if (show == 0) {
+    return max(0.0f, alpha-0.01);
+  } else {
+    return min(1.0f, alpha + 0.01);
+  }
+}
+
+void draw() {
   // Update timesteps
   previousTime = currentTime;
   currentTime = millis();
   dt = currentTime - previousTime;
 
-  if(nextChangeTime - currentTime < 0 && autochange){
+  if (nextChangeTime - currentTime < 0 && autochange) {
     nextChangeTime = currentTime + 10000 + int(random(10000));
     algorithmSelection = int(random(6));
   }
-  
-  if(algorithmSelection > 0 && currentAlgorithm != algorithmSelection){
+
+  if (algorithmSelection > 0 && currentAlgorithm != algorithmSelection) {
     currentAlgorithm = algorithmSelection;
-    switch(algorithmSelection){
+    print("Current algo: ");
+    println(currentAlgorithm);
+    switch(algorithmSelection) {
       case 0:
         showLogo = 1;
         showSprocket = 0;
@@ -147,51 +164,61 @@ void draw(){
         break;
     }
   }
-  
-  background(0);
+
+  alphaNoiseLines = updateAlpha(alphaNoiseLines, showNoiseLines);
+  alphaSprocket = updateAlpha(alphaSprocket, showSprocket);
+  alphaFT = updateAlpha(alphaFT, showFT);
+  alphaWaveform = updateAlpha(alphaWaveform, showWaveform);
+  alphaLogo = updateAlpha(alphaLogo, showLogo);
+  alphaNoiseLines = updateAlpha(alphaNoiseLines, showNoiseLines);
+
+  pushStyle();
+  colorMode(HSB, 360, 100, 100, 100);
+  background(202, 89, 20);
+  popStyle();
   fft.forward(wavesource.mix);
-  
-  if(showNoiseLines == 1){
+
+  if (alphaNoiseLines > 0) {
     drawNoiseLines();
   }
-  if(showSprocket == 1){
+  if (alphaSprocket > 0) {
     drawSprocket();
   }
-  if(showFT == 1){
+  if (alphaFT > 0) {
     drawFT();
   }
-  if(showWaveform == 1){
+  if (alphaWaveform > 0) {
     drawWaveform();
   }
-  if(showLogo == 1){
+  if (alphaLogo > 0) {
     drawLogo();
   }
-  if(showMessage == 1){
+  if (alphaMessage > 0) {
     drawMessage();
-  }else{
+  } else {
     messageDisabled = 1;
   }
 }
 
-void drawNoiseLines(){
+void drawNoiseLines() {
   noiseAlgorithm = noiseAlgorithm % 3;
   pushStyle();
   pushMatrix();
   translate(0, 0, -1); // Put these lines behind the logo and other stuff
-  colorMode(HSB, 360, 100, 100);
-  if(currentTime - previousNoiseTime > 100){
+  colorMode(HSB, 360, 100, 100, 100);
+  if (currentTime - previousNoiseTime > 100) {
     noise_offset = noise_offset + .03;
-    for(int i = 0; i < width; i++){
+    for(int i = 0; i < width; i++) {
       float n = -40 + noise(noise_offset+i*0.05)*80;
       n += noise(-noise_offset+i*0.03)*20;
-      if(noiseAlgorithm == 2){
+      if (noiseAlgorithm == 2) {
         noiseWarmthValue = noise(-noise_offset+i*0.03)*20;
       }
-      switch(noiseAlgorithm){
-        case 0: stroke(0, 0, min(100, n)); break;
-        case 1: stroke(0, 100, min(100, n)); break;
+      switch(noiseAlgorithm) {
+        case 0: stroke(0, 0, min(100, n), alphaNoiseLines*100); break;
+        case 1: stroke(0, 100, min(100, n), alphaNoiseLines*100); break;
         case 2:
-          stroke(noiseWarmthValue*6%360, 100-min(n,40), min(n*n*n/100,100));
+          stroke(noiseWarmthValue*6%360, 100-min(n,40), min(n*n*n/100,100), alphaNoiseLines*100);
           break;
       }
       line(i, 0, i, height);
@@ -200,8 +227,8 @@ void drawNoiseLines(){
   popMatrix();
   popStyle();
 }
- 
-void drawSprocket(){
+
+void drawSprocket() {
   float sprocketRingMoveScale = 500*micSensitivity;
   float sprocketBoxScale = 50*micSensitivity;
   pushStyle();
@@ -215,14 +242,14 @@ void drawSprocket(){
     angle[i] = angle[i] + fft.getFreq(i)/2000;
     rotateX(sin(angle[i]/2));
     rotateY(cos(angle[i]/2));
-    if(noiseAlgorithm != 2){
-      fill(fft.getFreq(i)*2, 255, 0);
-    }else{
-      if(showNoiseLines == 1){
-        colorMode(HSB, 360, 100, 100);
-        fill(noiseWarmthValue*6%360, 100, 100);
-      }else{
-        fill(255, 0, 0);
+    if (noiseAlgorithm != 2) {
+      fill(fft.getFreq(i)*2, 255, 0, alphaSprocket*100);
+    } else {
+      if (showNoiseLines == 1) {
+        colorMode(HSB, 360, 100, 100, 100);
+        fill(noiseWarmthValue*6%360, 100, 100, alphaSprocket*100);
+      } else {
+        fill(255, 0, 0, alphaSprocket*100);
       }
     }
     pushMatrix();
@@ -241,14 +268,14 @@ void drawSprocket(){
     angle[i] = angle[i] + fft.getFreq(i)/100000;
     rotateX(sin(angle[i]/2));
     rotateY(cos(angle[i]/2));
-    if(noiseAlgorithm < 2){
-      fill(0, 255-fft.getFreq(i)*2, 255-micSensitivity*fft.getBand(i)*2);
-    }else{
-      if(showNoiseLines == 1){
-        colorMode(HSB, 360, 100, 100);
-        fill(noiseWarmthValue*6%360, 100, 100);
-      }else{
-        fill(255, 0, 0);
+    if (noiseAlgorithm < 2) {
+      fill(0, 255-fft.getFreq(i)*2, 255-micSensitivity*fft.getBand(i)*2, alphaSprocket*100);
+    } else {
+      if (showNoiseLines == 1) {
+        colorMode(HSB, 360, 100, 100, 100);
+        fill(noiseWarmthValue*6%360, 100, 100, alphaSprocket*100);
+      } else {
+        fill(255, 0, 0, alphaSprocket*100);
       }
     }
     pushMatrix();
@@ -261,10 +288,11 @@ void drawSprocket(){
   popStyle();
 }
 
-void drawFT(){
+void drawFT() {
   float ftHeightScale = 30;
   pushStyle();
-  stroke(255, 0, 0);
+  colorMode(HSB, 360, 100, 100, 100);
+  stroke(202, 89, 90, alphaFT*100);
   for(int i = 0; i < fft.specSize()/2; i++)
   {
     float xval = (float(i)-0.5)/fft.specSize()*width;
@@ -275,22 +303,23 @@ void drawFT(){
   popStyle();
 }
 
-void drawWaveform(){
+void drawWaveform() {
   pushStyle();
-  stroke(255);
-  // I draw the waveform by connecting 
-  // neighbor values with a line. I multiply 
-  // each of the values by 50 
+  colorMode(HSB, 360, 100, 100, 100);
+  stroke(0, 0, 100, alphaWaveform*100);
+  // I draw the waveform by connecting
+  // neighbor values with a line. I multiply
+  // each of the values by 50
   // because the values in the buffers are normalized
-  // this means that they have values between -1 and 1. 
-  // If we don't scale them up our waveform 
+  // this means that they have values between -1 and 1.
+  // If we don't scale them up our waveform
   // will look more or less like a straight line.
   float xval1, xval2, yval1, yval2;
   strokeWeight(2);
   float waveformWidthScale = 1;
   float waveformHeightScale = micSensitivity*100;
-  
-  for(int i = 0; i < wavesourceLength/waveformWidthScale - 1; i++){
+
+  for(int i = 0; i < wavesourceLength/waveformWidthScale - 1; i++) {
       xval1 = waveformWidthScale*width*i/float(wavesourceLength);
       xval2 = waveformWidthScale*width*(i+1)/float(wavesourceLength);
       yval1 = (height/2) + waveformHeightScale*wavesource.left.get(i);
@@ -300,18 +329,19 @@ void drawWaveform(){
   popStyle();
 }
 
-void drawLogo(){
+void drawLogo() {
   pushStyle();
   blendMode(EXCLUSION);
   float aspect_ratio = logo_img.width/logo_img.height;
   float logo_width = min(width, logo_img.width);
   float logo_height = logo_width / aspect_ratio;
+  tint(255, alphaLogo*255);
   image(logo_img, width/2-logo_width/2, height/2-logo_height/2, logo_width, logo_height);
   popStyle();
 }
 
-void drawMessage(){
-  if (messageDisabled == 1){
+void drawMessage() {
+  if (messageDisabled == 1) {
     messageDisabled = 0;
     messageCounter = 0;
     messageTimer = millis();
@@ -326,27 +356,31 @@ void drawMessage(){
   text(message.substring(max(0, messageCounter-80), messageCounter), 0, 0);
   popStyle();
   // Automatically reset message after it finishes.
-  if (millis() > messageCounter * 60 + messageTimer + 4000){
+  if (millis() > messageCounter * 60 + messageTimer + 4000) {
     messageTimer = millis();
   }
 }
- 
-void stop(){
+
+void stop() {
   // always close Minim audio classes when you finish with them
   player.close();
   minim.stop();
   super.stop();
 }
 
-void keyPressed(){
+void keyPressed() {
   if (key == CODED) {
     if (keyCode == UP) {
       micSensitivity *= 1.1;
+      print("Mic sensitivity: ");
+      println(micSensitivity);
     } else if (keyCode == DOWN) {
       micSensitivity /= 1.1;
+      print("Mic sensitivity: ");
+      println(micSensitivity);
     }
   } else {
-    switch(key){
+    switch(key) {
       case '`':
         autochange = true;
         break;
